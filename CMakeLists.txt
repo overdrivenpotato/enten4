@@ -79,6 +79,28 @@ target_link_libraries(GLEW_110
     ${EXTRA_LIBS}
 )
 
+# Add SOIL
+set(SOIL_SRCDIR
+	libs/soil/src
+)
+
+set(SOIL_SRC
+    ${SOIL_SRCDIR}/SOIL.c
+	${SOIL_SRCDIR}/image_helper.c
+    ${SOIL_SRCDIR}/stb_image_aug.c
+    ${SOIL_SRCDIR}/image_DXT.c
+)
+
+include_directories(${SOIL_SRCDIR})
+
+add_library(SOIL STATIC
+	${SOIL_SRC}
+)
+
+target_link_libraries(SOIL
+	${OPENGL_LIBRARY}
+)
+
 # file(GLOB RESOURCES res)
 
 # Enten4 sources
@@ -96,6 +118,7 @@ add_executable(enten4 ${RESOURCES} ${enten4sources})
 
 set(ALL_LIBS
     SDL2-static
+    SOIL
     GLEW_110
 )
 

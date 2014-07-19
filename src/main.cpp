@@ -20,6 +20,8 @@ using namespace std;
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtx/rotate_vector.hpp>
 
+#include <SOIL.h>
+
 #include "basicshaders.h"
 #include "basicshapes.h"
 #include "shaders.h"

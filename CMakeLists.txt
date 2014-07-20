@@ -112,6 +112,7 @@ set(enten4sources
     src/basicshapes.h
     src/types.h
     src/mesh.cpp
+    src/camera.cpp
 )
 
 add_executable(enten4 ${RESOURCES} ${enten4sources})

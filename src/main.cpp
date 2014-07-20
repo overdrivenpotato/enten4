@@ -28,6 +28,7 @@ using namespace std;
 #include "engine.h"
 #include "mesh.h"
 #include "types.h"
+#include "camera.h"
 
 int main(int argc, char** argv) {
     if(argc > 1) {
@@ -42,27 +43,27 @@ int main(int argc, char** argv) {
     // Require opengl 3.1
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
 
-    // Anti-aliasing
+    // Anti-aliasingf
     SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
-    SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 8);
-
-    // Check for vsync
-    if(SDL_GL_SetSwapInterval(1) != 0) {
-        cerr << "VSync is not supported." << endl;
-    }
+    SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 4);
 
     // Creates a window
     SDL_Window* window = SDL_CreateWindow("SDL2 Enten4",
                                           SDL_WINDOWPOS_UNDEFINED,
                                           SDL_WINDOWPOS_UNDEFINED,
-                                          1280,
-                                          768,
+                                          1280, 768,
+//                                          1600, 900,
                                           SDL_WINDOW_OPENGL);
 
     // Attach openGL context to window
     SDL_GLContext glContext = SDL_GL_CreateContext(window);
+
+    // Enable vsync
+    if(SDL_GL_SetSwapInterval(1) != 0) {
+        cerr << "VSync is not supported: " << SDL_GetError() << endl;
+    }
 
     // Initialize GLEW
     glewExperimental = GL_TRUE;
@@ -71,6 +72,7 @@ int main(int argc, char** argv) {
         return -1;
     }
 
+    // Please exterminate
     auto meshVerts = basicmesh::cube;
     std::vector<std::vector<Mesh*>> meshes(4);
     for(uint i = 0; i < meshes.size(); i++) {
@@ -81,7 +83,7 @@ int main(int argc, char** argv) {
                 colors[u] = ((double)rand()) / RAND_MAX;
             }
 
-            meshes[i][j] = new Mesh(meshVerts, colors);
+            meshes[i][j] = new Mesh(meshVerts, colors, basicmesh::cubeUV);
         }
     }
 
@@ -89,7 +91,7 @@ int main(int argc, char** argv) {
     for(uint u = 0; u < planeColor.size(); u++) {
         planeColor[u] = ((double)rand()) / RAND_MAX;
     }
-    Mesh plane(basicmesh::meshPlane, planeColor);
+    Mesh plane(basicmesh::meshPlane, planeColor, basicmesh::planeUV);
 
     GLuint shaderID;
     try {
@@ -98,6 +100,19 @@ int main(int argc, char** argv) {
         cerr << compileError.what();
         return -1;
     }
+
+    GLuint tex;
+    glGenTextures(1, &tex);
+    glBindTexture(GL_TEXTURE_2D, tex);
+    int width, height;
+    unsigned char* image = SOIL_load_image("res/crate.jpg", &width, &height, 0, SOIL_LOAD_RGB);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, image);
+    SOIL_free_image_data(image);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
     glClearColor(0.3f, 0.3f, 0.7f, 1); // Background color
     glEnable(GL_CULL_FACE); // Disable rendering of faces viewed backwards
@@ -108,30 +123,68 @@ int main(int argc, char** argv) {
     SDL_SetRelativeMouseMode(SDL_TRUE);
     bool running = true;
 
-    glm::vec3 position(4.f, 4.f, 3.f);
-    glm::vec3 direction(-1, 0, -1);
-    glm::vec3 movement;
+    glm::vec3 cameraVelocity;
+    const float camSpeed = 0.2f;
+    CameraFP camera(glm::vec3(8.f, -7.5f, 8.f), glm::vec3(-1, 0, -1));
+
+    int frame = 0;
+    Uint32 lastTime = SDL_GetTicks();
 
     while(running) {
+        frame++;
+        Uint32 passed = SDL_GetTicks();
+        if(passed - lastTime > 1000) {
+            cout << "FPS: " << frame << endl;
+            lastTime = passed;
+            frame = 0;
+        }
         while(SDL_PollEvent(&windowEvent)) {
             if(windowEvent.type == SDL_KEYDOWN) {
                 switch(windowEvent.key.keysym.sym) {
                 case SDLK_w:
-                    movement.y = 1;
+                    cameraVelocity.z = camSpeed;
                     break;
                 case SDLK_s:
-                    movement.y = -1;
+                    cameraVelocity.z = -camSpeed;
+                    break;
+                case SDLK_a:
+                    cameraVelocity.x = camSpeed;
+                    break;
+                case SDLK_d:
+                    cameraVelocity.x = -camSpeed;
+                    break;
+                case SDLK_SPACE:
+                    cameraVelocity.y = camSpeed;
+                    break;
+                case SDLK_LSHIFT:
+                    cameraVelocity.y = -camSpeed;
                     break;
                 }
             } else if(windowEvent.type == SDL_KEYUP) {
                 switch(windowEvent.key.keysym.sym) {
                 case SDLK_w:
-                    if(movement.y > 0)
-                        movement.y = 0;
+                    if(cameraVelocity.z > 0)
+                        cameraVelocity.z = 0;
                     break;
                 case SDLK_s:
-                    if(movement.y < 0)
-                        movement.y = 0;
+                    if(cameraVelocity.z < 0)
+                        cameraVelocity.z = 0;
+                    break;
+                case SDLK_a:
+                    if(cameraVelocity.x > 0)
+                        cameraVelocity.x = 0;
+                    break;
+                case SDLK_d:
+                    if(cameraVelocity.x < 0)
+                        cameraVelocity.x = 0;
+                    break;
+                case SDLK_SPACE:
+                    if(cameraVelocity.y > 0)
+                        cameraVelocity.y = 0;
+                    break;
+                case SDLK_LSHIFT:
+                    if(cameraVelocity.y < 0)
+                        cameraVelocity.y = 0;
                     break;
                 }
             }
@@ -144,25 +197,26 @@ int main(int argc, char** argv) {
                 running = false;
                 break;
             case SDL_MOUSEMOTION:
-                direction = glm::rotate(direction, -windowEvent.motion.xrel * 0.005f, glm::vec3(0, 1, 0));
-                direction.y -= windowEvent.motion.yrel * 0.005f;
+                if(windowEvent.motion.xrel != 0) {
+                    camera.rotateYaw(-windowEvent.motion.xrel * 0.005f);
+                }
+                if(windowEvent.motion.yrel != 0) {
+                    camera.rotatePitch(windowEvent.motion.yrel * 0.005f);
+                }
                 break;
             default:
                 break;
             }
         }
 
-        position += movement.y * direction * 0.1f;
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glUseProgram(shaderID);
 
+        camera.translateRelative(cameraVelocity);
+
         glm::mat4 projection = glm::perspective((float) (M_PI / 3.f), 16.f / 9.f, 0.1f, 100.f);
-        glm::mat4 view = glm::lookAt(
-                    position,
-                    position + direction,
-                    glm::vec3(0, 1, 0)
-        );
+        glm::mat4 view = camera.getViewMatrix();
 
         // This will all be deleted
         for(uint i = 0; i < meshes.size(); i++) {

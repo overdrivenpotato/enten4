@@ -42,6 +42,7 @@ GLuint createVertFragShader(const char *vertexShaderSource, const char *fragment
     // TODO: remove + make dynamic
     glBindAttribLocation(shader, 0, "position");
     glBindAttribLocation(shader, 1, "color");
+    glBindAttribLocation(shader, 2, "texUVin");
 
     glLinkProgram(shader);
 
